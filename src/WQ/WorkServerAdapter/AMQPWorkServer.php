@@ -9,6 +9,7 @@ use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Exception\AMQPProtocolChannelException;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
 use PhpAmqpLib\Message\AMQPMessage;
+use PhpAmqpLib\Wire\AMQPTable;
 
 /**
  * This adapter class implements the {@see WorkServerAdapter} interface.
@@ -297,12 +298,12 @@ class AMQPWorkServer
 
             $chan = $this->chan;
 
-            $args = [
-                // After their TTL expires, messages get re-routed to the original exchange:
+            $args = new AMQPTable([
+                // After their TTL expires, messages get re-routed to the correct exchange:
                 'x-dead-letter-exchange' => $this->exchange,
                 // Without 'x-dead-letter-routing-key', the message's original routing key will be re-used
                 // which should ensure that the message finally reaches the correct queue.
-            ];
+            ]);
             $chan->exchange_declare($ex, 'direct', false, true, true, false, false, $args);
         }
 
