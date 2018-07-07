@@ -291,12 +291,28 @@ class AMQPWorkServer
      */
     private function delayExchange(): string
     {
-        $ex = '_phpwq._delay_exchange';
+        /*
+         * Delayed messages are not routed through the default exchange (""),
+         * they go to our special "_phpwq._delay_exchange" exchange instead.
+         * That's a FANOUT exchange bound only to the "_phpwq._delayed" queue
+         * and the only reason why the special exchange exists in the first place:
+         * so our delayed messages can keep their original routing key unchanged.
+         *
+         * The special "_phpwq._delayed" queue has a DLX setting set to the default exchange
+         * (x-dead-letter-exchange: "")
+         * so that expired messages in the queue will be put back into the default exchange.
+         * Because neither our special delay exchange nor our special delay queue
+         * have a x-dead-letter-routing-key setting,
+         * the messages will keep their original routing key
+         * and will therefore reach the correct target queue in the default exchange.
+         *
+         * Our delayed messages carry their delay in their per-message TTL setting (expiration).  */
+
+        $exchange_name = '_phpwq._delay_exchange';
+        $queue_name    = '_phpwq._delayed';
 
         if (!$this->declared_delay_exchange) {
             $this->declared_delay_exchange = true;
-
-            $chan = $this->chan;
 
             $args = new AMQPTable([
                 // After their TTL expires, messages get re-routed to the correct exchange:
@@ -304,10 +320,13 @@ class AMQPWorkServer
                 // Without 'x-dead-letter-routing-key', the message's original routing key will be re-used
                 // which should ensure that the message finally reaches the correct queue.
             ]);
-            $chan->exchange_declare($ex, 'direct', false, true, true, false, false, $args);
+
+            $this->chan->exchange_declare($exchange_name, 'fanout', false, true, false);
+            $this->chan->queue_declare($queue_name, false, true, false, false, false, $args);
+            $this->chan->queue_bind($queue_name, $exchange_name);
         }
 
-        return $ex;
+        return $exchange_name;
     }
 
     private $declared_delay_exchange = false;
