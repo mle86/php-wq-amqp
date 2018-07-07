@@ -291,7 +291,7 @@ class AMQPWorkServer
      */
     private function delayExchange(): string
     {
-        $ex = '_wq_delay_dlx';
+        $ex = '_phpwq._delay_exchange';
 
         if (!$this->declared_delay_exchange) {
             $this->declared_delay_exchange = true;
