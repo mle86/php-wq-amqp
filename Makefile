@@ -1,5 +1,5 @@
 #!/usr/bin/make -f
-.PHONY: all dep update
+.PHONY: all dep update test
 
 all:
 
@@ -17,4 +17,7 @@ $(COMPOSER):
 # update: Updates all composer dependencies of this library.
 update: $(COMPOSER)
 	$(COMPOSER) update
+
+test: dep
+	vendor/bin/phpunit -v
 
