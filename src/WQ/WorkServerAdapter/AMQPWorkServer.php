@@ -128,7 +128,7 @@ class AMQPWorkServer
                 $this->last_msg->getBody(),
                 $this->last_queue,
                 $this->last_msg,
-                '');
+                $this->getJobId($this->last_msg));
 
         } catch (UnserializationException $e) {
             $this->buryMessage($this->last_msg, $this->last_queue);
@@ -160,7 +160,7 @@ class AMQPWorkServer
                     $msg->getBody(),
                     $workQueue,
                     $msg,
-                    '');
+                    $this->getJobId($msg));
             }
         }
 
@@ -373,6 +373,19 @@ class AMQPWorkServer
     {
         $this->chan->queue_declare($workQueue,
             false, true, false, false);
+    }
+
+    /**
+     * The {@see QueueEntry} constructor requires a string “job ID” for every instance,
+     * although some implementations simply use the empty string
+     * because the underlying work server does not offer any usable identifier.
+     *
+     * @param AMQPMessage $amqpMessage
+     * @return string
+     */
+    private function getJobId(AMQPMessage $amqpMessage): string
+    {
+        return '';
     }
 
 }
