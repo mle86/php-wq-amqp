@@ -46,6 +46,8 @@ class AMQPWorkServer
     /** @var bool */
     private $declared_bury_exchange = false;
 
+    private const AMQP_NAMESPACE = '_phpwq.';
+
 
     /**
      * Constructor.
@@ -59,7 +61,7 @@ class AMQPWorkServer
     {
         $this->connection = $connection;
         $this->chan = $this->connection->channel();
-        $this->consumer_tag = uniqid('_phpwq._ct-', true);
+        $this->consumer_tag = uniqid(self::AMQP_NAMESPACE . '_ct-', true);
     }
 
     /**
@@ -259,8 +261,8 @@ class AMQPWorkServer
      */
     private function delayExchange(): string
     {
-        $exchange_name = '_phpwq._delay_exchange';
-        $queue_name    = '_phpwq._delayed';
+        $exchange_name = self::AMQP_NAMESPACE . '_delay_exchange';
+        $queue_name    = self::AMQP_NAMESPACE . '_delayed';
 
         if (!$this->declared_delay_exchange) {
             $this->declared_delay_exchange = true;
@@ -295,8 +297,8 @@ class AMQPWorkServer
      */
     private function buryExchange(): string
     {
-        $exchange_name = '_phpwq._bury_exchange';
-        $queue_name    = '_phpwq._BURIED';
+        $exchange_name = self::AMQP_NAMESPACE . '_bury_exchange';
+        $queue_name    = self::AMQP_NAMESPACE . '_BURIED';
 
         if (!$this->declared_bury_exchange) {
             $this->declared_bury_exchange = true;
