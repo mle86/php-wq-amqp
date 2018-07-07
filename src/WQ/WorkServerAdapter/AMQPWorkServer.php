@@ -89,18 +89,6 @@ class AMQPWorkServer
     }
 
 
-    /**
-     * This takes the next job from the named work queue
-     * and returns it.
-     *
-     * @param string|string[] $workQueue The name(s) of the Work Queue(s) to poll.
-     * @param int $timeout               How many seconds to wait for a job to arrive, if none is available immediately.
-     *                                   Set this to NOBLOCK if the method should return immediately.
-     *                                   Set this to BLOCK if the call should block until a job becomes available, no matter how long it takes.
-     * @return QueueEntry  Returns the next job in the work queue,
-     *                                   or NULL if no job was available after waiting for $timeout seconds.
-     * @throws UnserializationException
-     */
     public function getNextQueueEntry($workQueue, int $timeout = self::DEFAULT_TIMEOUT): ?QueueEntry
     {
         if ($timeout === WorkServerAdapter::NOBLOCK) {
@@ -162,14 +150,6 @@ class AMQPWorkServer
     }
 
 
-    /**
-     * Stores a job in the work queue for later processing.
-     *
-     * @param string $workQueue The name of the Work Queue to store the job in.
-     * @param Job $job          The job to store.
-     * @param int $delay        The job delay in seconds after which it will become available to {@see getNextQueueEntry()}.
-     *                          Set to zero (default) for jobs which should be processed as soon as possible.
-     */
     public function storeJob(string $workQueue, Job $job, int $delay = 0): void
     {
         $chan = $this->chan;
@@ -194,11 +174,7 @@ class AMQPWorkServer
     }
 
     /**
-     * Buries an existing job
-     * so that it won't be returned by {@see getNextQueueEntry()} again
-     * but is still present in the system for manual inspection.
-     *
-     * This is what happens to failed jobs.
+     * {@inheritdoc}
      *
      * @param QueueEntry $entry
      */
@@ -212,20 +188,6 @@ class AMQPWorkServer
         # TODO
     }
 
-    /**
-     * Re-queues an existing job
-     * so that it can be returned by {@see getNextQueueEntry()}
-     * again at some later time.
-     * A {@see $delay} is required
-     * to prevent the job from being returned right after it was re-queued.
-     *
-     * This is what happens to failed jobs which can still be re-queued for a retry.
-     *
-     * @param QueueEntry $entry       The job to re-queue. The instance should not be used anymore after this call.
-     * @param int $delay              The job delay in seconds. It will become available for {@see getNextQueueEntry()} after this delay.
-     * @param string|null $workQueue  By default, to job is re-queued into its original Work Queue ({@see QueueEntry::getWorkQueue}).
-     *                                With this parameter, a different Work Queue can be chosen.
-     */
     public function requeueEntry(QueueEntry $entry, int $delay, string $workQueue = null): void
     {
         $queue = $workQueue ?? $entry->getWorkQueue();
@@ -234,13 +196,6 @@ class AMQPWorkServer
         $this->storeJob($queue, $entry->getJob(), $delay);
     }
 
-    /**
-     * Permanently deletes a job entry for its work queue.
-     *
-     * This is what happens to finished jobs.
-     *
-     * @param QueueEntry $entry The job to delete.
-     */
     public function deleteEntry(QueueEntry $entry): void
     {
         /** @var AMQPMessage $amqpMessage */
@@ -253,27 +208,26 @@ class AMQPWorkServer
      * Returns the name of the delay exchange to use for delayed messages
      * and declares it once.
      *
+     * Delayed messages are not routed through the default exchange (""),
+     * they go to our special "_phpwq._delay_exchange" exchange instead.
+     * That's a FANOUT exchange bound only to the "_phpwq._delayed" queue
+     * and the only reason why the special exchange exists in the first place:
+     * so our delayed messages can keep their original routing key unchanged.
+     *
+     * The special "_phpwq._delayed" queue has a DLX setting set to the default exchange
+     * (x-dead-letter-exchange: "")
+     * so that expired messages in the queue will be put back into the default exchange.
+     * Because neither our special delay exchange nor our special delay queue
+     * have a x-dead-letter-routing-key setting,
+     * the messages will keep their original routing key
+     * and will therefore reach the correct target queue in the default exchange.
+     *
+     * Our delayed messages carry their delay in their per-message TTL setting (expiration).
+     *
      * @return string
      */
     private function delayExchange(): string
     {
-        /*
-         * Delayed messages are not routed through the default exchange (""),
-         * they go to our special "_phpwq._delay_exchange" exchange instead.
-         * That's a FANOUT exchange bound only to the "_phpwq._delayed" queue
-         * and the only reason why the special exchange exists in the first place:
-         * so our delayed messages can keep their original routing key unchanged.
-         *
-         * The special "_phpwq._delayed" queue has a DLX setting set to the default exchange
-         * (x-dead-letter-exchange: "")
-         * so that expired messages in the queue will be put back into the default exchange.
-         * Because neither our special delay exchange nor our special delay queue
-         * have a x-dead-letter-routing-key setting,
-         * the messages will keep their original routing key
-         * and will therefore reach the correct target queue in the default exchange.
-         *
-         * Our delayed messages carry their delay in their per-message TTL setting (expiration).  */
-
         $exchange_name = '_phpwq._delay_exchange';
         $queue_name    = '_phpwq._delayed';
 
