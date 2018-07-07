@@ -30,11 +30,22 @@ and should be compatible
 with all of its future 1.x versions as well.
 
 
-# Installation
+# Installation and Dependencies
 
 ```
 $ composer require mle86/wq-amqp
 ```
+
+It requires PHP 7.1.
+
+It depends on
+[mle86/wq](https://github.com/mle86/php-wq)
+and [php-amqplib/php-amqplib](https://github.com/php-amqplib/php-amqplib),
+which in turn requires the
+[mbstring](https://php.net/manual/book.mbstring.php)
+and
+[bcmath](https://php.net/manual/book.bc.php)
+PHP extensions.
 
 
 # Class reference
