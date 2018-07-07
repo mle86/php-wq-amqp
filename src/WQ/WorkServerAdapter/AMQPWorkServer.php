@@ -39,6 +39,8 @@ class AMQPWorkServer
     private $last_queue;
     /** @var bool */
     private $do_cleanup = true;
+    /** @var array  [workQueue => [deliveryTag => true, …]]  Delivery tags of messages that have been received but not ACK'ed by us. */
+    private $open_messages = [];
 
     /**
      * Constructor.
@@ -155,11 +157,14 @@ class AMQPWorkServer
 
         try {
             // We got a message in $last_msg, try to decode and return it:
-            return QueueEntry::fromSerializedJob(
+            $qe = QueueEntry::fromSerializedJob(
                 $this->last_msg->getBody(),
                 $this->last_queue,
                 $this->last_msg,
                 '');
+
+            $this->open_messages[$this->last_queue][$this->last_msg->delivery_info['delivery_tag']] = true;
+            return $qe;
 
         } catch (UnserializationException $e) {
             $this->buryMessage($this->last_msg);
@@ -173,11 +178,14 @@ class AMQPWorkServer
             $this->initQueue($workQueue);
             /** @var AMQPMessage|null $msg */
             if (($msg = $this->chan->basic_get($workQueue, false))) {
-                return QueueEntry::fromSerializedJob(
+                $qe = QueueEntry::fromSerializedJob(
                     $msg->getBody(),
                     $workQueue,
                     $msg,
                     '');
+
+                $this->open_messages[$workQueue][$msg->delivery_info['delivery_tag']] = true;
+                return $qe;
             }
         }
 
@@ -269,7 +277,9 @@ class AMQPWorkServer
     {
         /** @var AMQPMessage $amqpMessage */
         $amqpMessage = $entry->getHandle();
-        $this->chan->basic_ack($amqpMessage->delivery_info['delivery_tag']);
+        $deliveryTag = $amqpMessage->delivery_info['delivery_tag'];
+        $this->chan->basic_ack($deliveryTag);
+        unset($this->open_messages[$entry->getWorkQueue()][$deliveryTag]);
     }
 
     /**
@@ -349,6 +359,12 @@ class AMQPWorkServer
 
     private function deleteEmptyQueue(string $workQueue): void
     {
+        if (!empty($this->open_messages[$workQueue])) {
+            // Cannot delete wq, it has open messages.
+            // queue_delete(if_empty) would STILL delete that wq because THIS client cannot see the messages anymore!
+            return;
+        }
+
         try {
             unset($this->open_queues[$workQueue]);
             $this->chan->queue_delete($workQueue, true, true);
