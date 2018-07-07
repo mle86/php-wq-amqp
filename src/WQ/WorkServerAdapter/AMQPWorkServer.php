@@ -15,7 +15,13 @@ use PhpAmqpLib\Wire\AMQPTable;
  *
  * It connects to an AMQP server such as RabbitMQ.
  *
+ * It creates durable queues in the default exchange (“”) for immediate-delivery jobs
+ * and the durable “`_phpwq._delayed`” queue in the custom “`_phpwq._delay_exchange`” exchange for delayed jobs.
+ * Jobs stored with {@see storeJob()} are always durable as well.
+ * Empty queues or exchanges won't be deleted automatically.
+ *
  * @see https://github.com/php-amqplib/php-amqplib  Uses the php-amqplib/php-amqplib package
+ * @see https://www.rabbitmq.com/  RabbitMQ homepage
  */
 class AMQPWorkServer
     implements WorkServerAdapter
