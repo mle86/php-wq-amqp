@@ -43,6 +43,8 @@ class AMQPWorkServer
     private $last_queue;
     /** @var bool */
     private $declared_delay_exchange = false;
+    /** @var bool */
+    private $declared_bury_exchange = false;
 
 
     /**
@@ -129,7 +131,7 @@ class AMQPWorkServer
                 '');
 
         } catch (UnserializationException $e) {
-            $this->buryMessage($this->last_msg);
+            $this->buryMessage($this->last_msg, $this->last_queue);
             throw $e;
         }
     }
@@ -179,16 +181,25 @@ class AMQPWorkServer
     /**
      * {@inheritdoc}
      *
+     * Internally,
+     * this re-publishes the failed job to the bury exchange ("_phpwq._bury_exchange")
+     * where it will end up in the bury queue ("_phpwq._BURIED").
+     *
      * @param QueueEntry $entry
      */
     public function buryEntry(QueueEntry $entry): void
     {
-        $this->buryMessage($entry->getHandle());
+        $this->buryMessage($entry->getHandle(), $entry->getWorkQueue());
     }
 
-    private function buryMessage(AMQPMessage $message): void
+    private function buryMessage(AMQPMessage $amqpMessage, string $originWorkQueue): void
     {
-        # TODO
+        // first get rid of the original message...
+        $this->deleteMessage($amqpMessage);
+
+        // then store an exact copy in the Bury exchange/queue for later inspection:
+        $targetExchange = $this->buryExchange();
+        $this->chan->basic_publish($amqpMessage, $targetExchange, $originWorkQueue, true);
     }
 
     public function requeueEntry(QueueEntry $entry, int $delay, string $workQueue = null): void
@@ -246,6 +257,35 @@ class AMQPWorkServer
                 // Without 'x-dead-letter-routing-key', the message's original routing key will be re-used
                 // which should ensure that the message finally reaches the correct queue.
             ]);
+
+            $this->chan->exchange_declare($exchange_name, 'fanout', false, true, false);
+            $this->chan->queue_declare($queue_name, false, true, false, false, false, $args);
+            $this->chan->queue_bind($queue_name, $exchange_name);
+        }
+
+        return $exchange_name;
+    }
+
+    /**
+     * Returns the name of the bury exchange to use for buried messages
+     * and declares it once.
+     *
+     * Similar to the {@see delayExchange},
+     * this is a FANOUT exchange bound to one single durable queue ("_phpwq._BURIED")
+     * so that all messages published to that exchange end up in that queue
+     * regardless of their actual routing key --
+     * this way, their original routing key (i.e. target work queue name)
+     * is still available in their delivery_info.
+     *
+     * @return string
+     */
+    private function buryExchange(): string
+    {
+        $exchange_name = '_phpwq._bury_exchange';
+        $queue_name    = '_phpwq._BURIED';
+
+        if (!$this->declared_bury_exchange) {
+            $this->declared_bury_exchange = true;
 
             $this->chan->exchange_declare($exchange_name, 'fanout', false, true, false);
             $this->chan->queue_declare($queue_name, false, true, false, false, false, $args);
