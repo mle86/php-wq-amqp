@@ -48,7 +48,7 @@ class AMQPWorkServer
     {
         $this->connection = $connection;
         $this->chan = $this->connection->channel();
-        $this->consumer_tag = uniqid('WQ.', true);
+        $this->consumer_tag = uniqid('_phpwq._ct-', true);
     }
 
     /**
@@ -326,7 +326,7 @@ class AMQPWorkServer
 
     private function queueConsumerTag(string $workQueue): string
     {
-        return $this->consumer_tag . '-' . $workQueue;
+        return $this->consumer_tag . '.' . $workQueue;
     }
 
     private function initQueue(string $workQueue): void
