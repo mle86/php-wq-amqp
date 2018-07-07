@@ -385,7 +385,7 @@ class AMQPWorkServer
      */
     private function getJobId(AMQPMessage $amqpMessage): string
     {
-        return '';
+        return $amqpMessage->delivery_info['delivery_tag'] ?? '';
     }
 
 }
