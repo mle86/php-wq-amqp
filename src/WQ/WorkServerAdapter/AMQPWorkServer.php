@@ -6,7 +6,6 @@ use mle86\WQ\Job\Job;
 use mle86\WQ\Job\QueueEntry;
 use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
-use PhpAmqpLib\Exception\AMQPProtocolChannelException;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
 use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Wire\AMQPTable;
@@ -30,18 +29,12 @@ class AMQPWorkServer
     private $exchange = '';  // AMQP default
     /** @var array  [queueName => queueConsumerTag, …] */
     private $current_queues = [];
-    /** @var array  [queueName => true, …]  List of queues currently opened via initQueue() and not yet closed. */
-    private $open_queues = [];
     /** @var string */
     private $consumer_tag;
     /** @var AMQPMessage|null */
     private $last_msg;
     /** @var string|null */
     private $last_queue;
-    /** @var bool */
-    private $do_cleanup = true;
-    /** @var array  [workQueue => [deliveryTag => true, …]]  Delivery tags of messages that have been received but not ACK'ed by us. */
-    private $open_messages = [];
 
     /**
      * Constructor.
@@ -56,32 +49,6 @@ class AMQPWorkServer
         $this->connection = $connection;
         $this->chan = $this->connection->channel();
         $this->consumer_tag = uniqid('WQ.', true);
-
-        // On shutdown we'd like to delete all unused, empty queues we created previously.
-        // We cannot do this in __destruct because at this point the channel connection is probably gone,
-        // so it'll have to go in a shutdown handler :(
-        register_shutdown_function(function(){
-            if ($this->do_cleanup) {
-                $this->deleteAllKnownEmptyQueues();
-            }
-        });
-    }
-
-    /**
-     * Sets the cleanup flag for this instance.
-     *
-     * If it's true (default),
-     * the instance installs a shutdown handler
-     * that tries to delete all queues it previously touched
-     * (only if they're really empty and not currently in use).
-     *
-     * @param bool $do_cleanup
-     * @return self
-     */
-    public function withCleanup(bool $do_cleanup = true): self
-    {
-        $this->do_cleanup = $do_cleanup;
-        return $this;
     }
 
     /**
@@ -158,14 +125,11 @@ class AMQPWorkServer
 
         try {
             // We got a message in $last_msg, try to decode and return it:
-            $qe = QueueEntry::fromSerializedJob(
+            return QueueEntry::fromSerializedJob(
                 $this->last_msg->getBody(),
                 $this->last_queue,
                 $this->last_msg,
                 '');
-
-            $this->open_messages[$this->last_queue][$this->last_msg->delivery_info['delivery_tag']] = true;
-            return $qe;
 
         } catch (UnserializationException $e) {
             $this->buryMessage($this->last_msg);
@@ -179,14 +143,11 @@ class AMQPWorkServer
             $this->initQueue($workQueue);
             /** @var AMQPMessage|null $msg */
             if (($msg = $this->chan->basic_get($workQueue, false))) {
-                $qe = QueueEntry::fromSerializedJob(
+                return QueueEntry::fromSerializedJob(
                     $msg->getBody(),
                     $workQueue,
                     $msg,
                     '');
-
-                $this->open_messages[$workQueue][$msg->delivery_info['delivery_tag']] = true;
-                return $qe;
             }
         }
 
@@ -280,7 +241,6 @@ class AMQPWorkServer
         $amqpMessage = $entry->getHandle();
         $deliveryTag = $amqpMessage->delivery_info['delivery_tag'];
         $this->chan->basic_ack($deliveryTag);
-        unset($this->open_messages[$entry->getWorkQueue()][$deliveryTag]);
     }
 
     /**
@@ -344,7 +304,6 @@ class AMQPWorkServer
         // first, unregister from all previous queues:
         foreach ($this->current_queues as $wq => $consumerTag) {
             $chan->basic_cancel($consumerTag);
-            $this->deleteEmptyQueue($wq);
         }
 
         $this->current_queues = [];
@@ -374,42 +333,6 @@ class AMQPWorkServer
     {
         $this->chan->queue_declare($workQueue,
             false, true, false, false);
-        $this->open_queues[$workQueue] = true;
-    }
-
-    private function deleteEmptyQueue(string $workQueue): void
-    {
-        if (!empty($this->open_messages[$workQueue])) {
-            // Cannot delete wq, it has open messages.
-            // queue_delete(if_empty) would STILL delete that wq because THIS client cannot see the messages anymore!
-            return;
-        }
-
-        try {
-            unset($this->open_queues[$workQueue]);
-            $this->chan->queue_delete($workQueue, true, true);
-        } catch (AMQPProtocolChannelException $e) {
-            // don't care
-            return;
-        }
-    }
-
-    private function deleteAllKnownEmptyQueues(): void
-    {
-        if (!$this->chan || !$this->chan->getConnection() || !$this->chan->getConnection()->isConnected()) {
-            return;
-        }
-
-        foreach ($this->current_queues as $wq => $consumerTag) {
-            // cancel all active subscriptions or deleteEmptyQueue() won't work
-            // as it only deletes queues that aren't in use:
-            $this->chan->basic_cancel($consumerTag);
-            $this->deleteEmptyQueue($wq);
-        }
-        foreach (array_keys($this->open_queues) as $workQueue) {
-            // now delete all other queues we touched (with timeout=NOBLOCK):
-            $this->deleteEmptyQueue($workQueue);
-        }
     }
 
 }
