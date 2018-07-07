@@ -41,6 +41,9 @@ class AMQPWorkServer
     private $last_msg;
     /** @var string|null */
     private $last_queue;
+    /** @var bool */
+    private $declared_delay_exchange = false;
+
 
     /**
      * Constructor.
@@ -251,8 +254,6 @@ class AMQPWorkServer
 
         return $exchange_name;
     }
-
-    private $declared_delay_exchange = false;
 
     private function consumeQueues(array $workQueues): void
     {
