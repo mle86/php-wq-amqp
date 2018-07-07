@@ -198,8 +198,11 @@ class AMQPWorkServer
 
     public function deleteEntry(QueueEntry $entry): void
     {
-        /** @var AMQPMessage $amqpMessage */
-        $amqpMessage = $entry->getHandle();
+        $this->deleteMessage($entry->getHandle());
+    }
+
+    private function deleteMessage(AMQPMessage $amqpMessage): void
+    {
         $deliveryTag = $amqpMessage->delivery_info['delivery_tag'];
         $this->chan->basic_ack($deliveryTag);
     }
