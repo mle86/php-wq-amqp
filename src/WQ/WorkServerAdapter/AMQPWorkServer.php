@@ -136,6 +136,20 @@ class AMQPWorkServer
         }
     }
 
+    /**
+     * Returns the next queue entry from any of the queue arguments,
+     * immediately returning NULL if they're all empty.
+     *
+     * {@see AMQPChannel::wait} has a timeout argument,
+     * but it cannot be lower than 1 second.
+     * That's why {@see getNextQueueEntry} defers to this method
+     * when called with <tt>timeout={@see WorkServerAdapter::NOBLOCK}</tt>.
+     *
+     * To this end, it uses `basic_get()` instead of `basic_consume()`+`wait()`.
+     *
+     * @param string[] $workQueues
+     * @return QueueEntry|null
+     */
     private function getNextNonblockingQueueEntry(array $workQueues): ?QueueEntry
     {
         foreach ($workQueues as $workQueue) {
@@ -295,6 +309,15 @@ class AMQPWorkServer
         return $exchange_name;
     }
 
+    /**
+     * Calls {@see AMQPChannel::basic_consume} on one or more queue names.
+     *
+     * Internally it keeps track of the list of consumed queue names
+     * and only re-issues the `basic_consume` calls if the list has changed.
+     * In that case, the previous queue subscriptions are {@see AMQPChannel::basic_cancel}led.
+     *
+     * @param string[] $workQueues
+     */
     private function consumeQueues(array $workQueues): void
     {
         if (array_keys($this->current_queues) === $workQueues) {
@@ -328,11 +351,24 @@ class AMQPWorkServer
         }
     }
 
+    /**
+     * The consumer tag used for one queue name.
+     * This is needed so that {@see consumeQueues} is able to later cancel queue subscriptions.
+     *
+     * @param string $workQueue
+     * @return string
+     */
     private function queueConsumerTag(string $workQueue): string
     {
         return $this->consumer_tag . '.' . $workQueue;
     }
 
+    /**
+     * Declares a queue by name with suitable default settings
+     * if it does not exist already.
+     *
+     * @param string $workQueue
+     */
     private function initQueue(string $workQueue): void
     {
         $this->chan->queue_declare($workQueue,
