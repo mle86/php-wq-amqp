@@ -388,6 +388,15 @@ class AMQPWorkServer
     {
         // The connection object may still be reachable through some hidden circular reference.
         // Make sure there's no real connection anymore:
-        $this->connection->close();
+        $this->disconnect();
+    }
+
+    public function disconnect(): void
+    {
+        if ($this->connection) {
+            $this->connection->close();
+            $this->chan = null;
+            $this->connection = null;
+        }
     }
 }
