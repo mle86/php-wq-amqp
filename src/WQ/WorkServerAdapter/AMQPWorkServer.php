@@ -334,13 +334,24 @@ class AMQPWorkServer
 
         $this->current_queues = [];
 
+        $my_last_msg   =& $this->last_msg;
+        $my_last_queue =& $this->last_queue;
+
         // now register with all queues to be consumed:
         foreach ($workQueues as $workQueue) {
-            $callback = function(AMQPMessage $msg) use($workQueue) {
+            $callback = (function(AMQPMessage $msg) use($workQueue, &$my_last_msg, &$my_last_queue) {
                 // Pass info out to the getNextQueueEntry method:
-                $this->last_msg   = $msg;
-                $this->last_queue = $workQueue;
-            };
+                $my_last_msg   = $msg;
+                $my_last_queue = $workQueue;
+
+                /* Usually we'd simply write to $this->last_msg and $this->last_queue here,
+                 * but that means that the closure contains a reference to $this AMQPWorkServer.
+                 * We store the AMQPChannel in $this->chan but that object also stores the closures somewhere
+                 * (until the subscription gets cancelled again),
+                 * so we have a circular reference that may persist for quite some time
+                 * and cause a memory leak (at least until the next gc_collect_cycles call).
+                 * The bindTo(null) trick avoids that (the closure has no $this reference anymore).  */
+            })->bindTo(null);
 
             $this->initQueue($workQueue);
             $consumerTag = $chan->basic_consume($workQueue, '', false, false, false, false, $callback);
