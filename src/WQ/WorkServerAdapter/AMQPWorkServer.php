@@ -384,4 +384,10 @@ class AMQPWorkServer
         return $amqpMessage->delivery_info['delivery_tag'] ?? '';
     }
 
+    public function __destruct()
+    {
+        // The connection object may still be reachable through some hidden circular reference.
+        // Make sure there's no real connection anymore:
+        $this->connection->close();
+    }
 }
