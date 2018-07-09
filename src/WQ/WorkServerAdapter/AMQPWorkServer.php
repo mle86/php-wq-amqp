@@ -35,8 +35,6 @@ class AMQPWorkServer
     private $exchange = '';  // AMQP default
     /** @var array  [queueName => queueConsumerTag, …] */
     private $current_queues = [];
-    /** @var string */
-    private $consumer_tag;
     /** @var AMQPMessage|null */
     private $last_msg;
     /** @var string|null */
@@ -61,7 +59,6 @@ class AMQPWorkServer
     {
         $this->connection = $connection;
         $this->chan = $this->connection->channel();
-        $this->consumer_tag = uniqid(self::AMQP_NAMESPACE . '_ct-', true);
     }
 
     /**
@@ -339,9 +336,6 @@ class AMQPWorkServer
 
         // now register with all queues to be consumed:
         foreach ($workQueues as $workQueue) {
-            $consumerTag = $this->queueConsumerTag($workQueue);
-            $this->current_queues[$workQueue] = $consumerTag;
-
             $callback = function(AMQPMessage $msg) use($workQueue) {
                 // Pass info out to the getNextQueueEntry method:
                 $this->last_msg   = $msg;
@@ -349,20 +343,9 @@ class AMQPWorkServer
             };
 
             $this->initQueue($workQueue);
-            $chan->basic_consume($workQueue, $consumerTag, false, false, false, false, $callback);
+            $consumerTag = $chan->basic_consume($workQueue, '', false, false, false, false, $callback);
+            $this->current_queues[$workQueue] = $consumerTag;
         }
-    }
-
-    /**
-     * The consumer tag used for one queue name.
-     * This is needed so that {@see consumeQueues} is able to later cancel queue subscriptions.
-     *
-     * @param string $workQueue
-     * @return string
-     */
-    private function queueConsumerTag(string $workQueue): string
-    {
-        return $this->consumer_tag . '.' . $workQueue;
     }
 
     /**
