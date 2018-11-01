@@ -11,9 +11,7 @@
 	} ],
 
 	"autoload": {
-		"psr-4": {
-			"mle86\\WQ\\": "src/WQ/"
-		}
+		"psr-4": { "mle86\\WQ\\WorkServerAdapter\\": "src/WQ/WorkServerAdapter/" }
 	},
 
 	"require-dev": {
