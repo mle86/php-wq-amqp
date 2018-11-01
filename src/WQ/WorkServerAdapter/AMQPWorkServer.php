@@ -1,4 +1,5 @@
 <?php
+
 namespace mle86\WQ\WorkServerAdapter;
 
 use mle86\WQ\Exception\UnserializationException;
@@ -23,8 +24,7 @@ use PhpAmqpLib\Wire\AMQPTable;
  * @see https://github.com/php-amqplib/php-amqplib  Uses the php-amqplib/php-amqplib package
  * @see https://www.rabbitmq.com/  RabbitMQ homepage
  */
-class AMQPWorkServer
-    implements WorkServerAdapter
+class AMQPWorkServer implements WorkServerAdapter
 {
 
     /** @var AMQPStreamConnection */

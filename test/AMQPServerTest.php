@@ -1,4 +1,5 @@
 <?php
+
 namespace mle86\WQ\Tests;
 
 use mle86\WQ\Testing\AbstractWorkServerAdapterTest;
@@ -6,11 +7,10 @@ use mle86\WQ\WorkServerAdapter\WorkServerAdapter;
 use mle86\WQ\WorkServerAdapter\AMQPWorkServer;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 
-class AMQPServerTest
-    extends AbstractWorkServerAdapterTest
+class AMQPServerTest extends AbstractWorkServerAdapterTest
 {
 
-    const DEFAULT_PORT = 5672;
+    private const DEFAULT_PORT = 5672;
 
     public function checkEnvironment(): void
     {
@@ -31,7 +31,7 @@ class AMQPServerTest
     {
         $e = null;
         try {
-            (new AMQPWorkServer (new AMQPStreamConnection($host, $port, 'guest', 'guest')))
+            (new AMQPWorkServer(new AMQPStreamConnection($host, $port, 'guest', 'guest')))
                 ->getNextQueueEntry("@this-should-not-exist-29743984375345", AMQPWorkServer::NOBLOCK);
         } catch (\Exception $e) {
             // continue...
