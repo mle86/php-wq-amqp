@@ -34,15 +34,15 @@ class AMQPWorkServer implements WorkServerAdapter
     /** @var string */
     private $exchange = '';  // AMQP default
     /** @var array  [queueName => queueConsumerTag, …] */
-    private $current_queues = [];
+    private $currentQueues = [];
     /** @var AMQPMessage|null */
-    private $last_msg;
+    private $lastMsg;
     /** @var string|null */
-    private $last_queue;
+    private $lastQueue;
     /** @var bool */
-    private $declared_delay_exchange = false;
+    private $isDelayExchangeDeclared = false;
     /** @var bool */
-    private $declared_bury_exchange = false;
+    private $isBuryExchangeDeclared = false;
 
     private const AMQP_NAMESPACE = '_phpwq.';
 
@@ -105,8 +105,8 @@ class AMQPWorkServer implements WorkServerAdapter
             $timeout = 0;
         }
 
-        $this->last_msg   = null;
-        $this->last_queue = null;
+        $this->lastMsg   = null;
+        $this->lastQueue = null;
         $this->consumeQueues((array)$workQueue);
 
         try {
@@ -116,7 +116,7 @@ class AMQPWorkServer implements WorkServerAdapter
             return null;
         }
 
-        if ($this->last_msg === null) {
+        if ($this->lastMsg === null) {
             // ?!
             return null;
         }
@@ -124,13 +124,13 @@ class AMQPWorkServer implements WorkServerAdapter
         try {
             // We got a message in $last_msg, try to decode and return it:
             return QueueEntry::fromSerializedJob(
-                $this->last_msg->getBody(),
-                $this->last_queue,
-                $this->last_msg,
-                $this->getJobId($this->last_msg));
+                $this->lastMsg->getBody(),
+                $this->lastQueue,
+                $this->lastMsg,
+                $this->getJobId($this->lastMsg));
 
         } catch (UnserializationException $e) {
-            $this->buryMessage($this->last_msg, $this->last_queue);
+            $this->buryMessage($this->lastMsg, $this->lastQueue);
             throw $e;
         }
     }
@@ -258,11 +258,11 @@ class AMQPWorkServer implements WorkServerAdapter
      */
     private function delayExchange(): string
     {
-        $exchange_name = self::AMQP_NAMESPACE . '_delay_exchange';
-        $queue_name    = self::AMQP_NAMESPACE . '_delayed';
+        $exchangeName = self::AMQP_NAMESPACE . '_delay_exchange';
+        $queueName    = self::AMQP_NAMESPACE . '_delayed';
 
-        if (!$this->declared_delay_exchange) {
-            $this->declared_delay_exchange = true;
+        if (!$this->isDelayExchangeDeclared) {
+            $this->isDelayExchangeDeclared = true;
 
             $args = new AMQPTable([
                 // After their TTL expires, messages get re-routed to the correct exchange:
@@ -271,12 +271,12 @@ class AMQPWorkServer implements WorkServerAdapter
                 // which should ensure that the message finally reaches the correct queue.
             ]);
 
-            $this->chan->exchange_declare($exchange_name, 'fanout', false, true, false);
-            $this->chan->queue_declare($queue_name, false, true, false, false, false, $args);
-            $this->chan->queue_bind($queue_name, $exchange_name);
+            $this->chan->exchange_declare($exchangeName, 'fanout', false, true, false);
+            $this->chan->queue_declare($queueName, false, true, false, false, false, $args);
+            $this->chan->queue_bind($queueName, $exchangeName);
         }
 
-        return $exchange_name;
+        return $exchangeName;
     }
 
     /**
@@ -294,18 +294,18 @@ class AMQPWorkServer implements WorkServerAdapter
      */
     private function buryExchange(): string
     {
-        $exchange_name = self::AMQP_NAMESPACE . '_bury_exchange';
-        $queue_name    = self::AMQP_NAMESPACE . '_BURIED';
+        $exchangeName = self::AMQP_NAMESPACE . '_bury_exchange';
+        $queueName    = self::AMQP_NAMESPACE . '_BURIED';
 
-        if (!$this->declared_bury_exchange) {
-            $this->declared_bury_exchange = true;
+        if (!$this->isBuryExchangeDeclared) {
+            $this->isBuryExchangeDeclared = true;
 
-            $this->chan->exchange_declare($exchange_name, 'fanout', false, true, false);
-            $this->chan->queue_declare($queue_name, false, true, false, false, false);
-            $this->chan->queue_bind($queue_name, $exchange_name);
+            $this->chan->exchange_declare($exchangeName, 'fanout', false, true, false);
+            $this->chan->queue_declare($queueName, false, true, false, false, false);
+            $this->chan->queue_bind($queueName, $exchangeName);
         }
 
-        return $exchange_name;
+        return $exchangeName;
     }
 
     /**
@@ -319,7 +319,7 @@ class AMQPWorkServer implements WorkServerAdapter
      */
     private function consumeQueues(array $workQueues): void
     {
-        if (array_keys($this->current_queues) === $workQueues) {
+        if (array_keys($this->currentQueues) === $workQueues) {
             // Same consumption list, so we don't have to change anything.
             // The previous callbacks are also still good because they all write to $last_qe.
             return;
@@ -328,23 +328,23 @@ class AMQPWorkServer implements WorkServerAdapter
         $chan = $this->chan;
 
         // first, unregister from all previous queues:
-        foreach ($this->current_queues as $wq => $consumerTag) {
+        foreach ($this->currentQueues as $wq => $consumerTag) {
             $chan->basic_cancel($consumerTag);
         }
 
-        $this->current_queues = [];
+        $this->currentQueues = [];
 
-        $my_last_msg   =& $this->last_msg;
-        $my_last_queue =& $this->last_queue;
+        $myLastMsg   =& $this->lastMsg;
+        $myLastQueue =& $this->lastQueue;
 
         // now register with all queues to be consumed:
         foreach ($workQueues as $workQueue) {
-            $callback = (function(AMQPMessage $msg) use($workQueue, &$my_last_msg, &$my_last_queue) {
+            $callback = (function(AMQPMessage $msg) use($workQueue, &$myLastMsg, &$myLastQueue) {
                 // Pass info out to the getNextQueueEntry method:
-                $my_last_msg   = $msg;
-                $my_last_queue = $workQueue;
+                $myLastMsg   = $msg;
+                $myLastQueue = $workQueue;
 
-                /* Usually we'd simply write to $this->last_msg and $this->last_queue here,
+                /* Usually we'd simply write to $this->lastMsg and $this->lastQueue here,
                  * but that means that the closure contains a reference to $this AMQPWorkServer.
                  * We store the AMQPChannel in $this->chan but that object also stores the closures somewhere
                  * (until the subscription gets cancelled again),
@@ -355,7 +355,7 @@ class AMQPWorkServer implements WorkServerAdapter
 
             $this->initQueue($workQueue);
             $consumerTag = $chan->basic_consume($workQueue, '', false, false, false, false, $callback);
-            $this->current_queues[$workQueue] = $consumerTag;
+            $this->currentQueues[$workQueue] = $consumerTag;
         }
     }
 
