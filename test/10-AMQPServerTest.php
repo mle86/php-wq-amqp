@@ -1,11 +1,10 @@
 <?php
 namespace mle86\WQ\Tests;
 
+use mle86\WQ\Testing\AbstractWorkServerAdapterTest;
 use mle86\WQ\WorkServerAdapter\WorkServerAdapter;
 use mle86\WQ\WorkServerAdapter\AMQPWorkServer;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
-
-require_once __DIR__ . '/../vendor/mle86/wq/test/helper/AbstractWorkServerAdapterTest.php';
 
 class AMQPServerTest
     extends AbstractWorkServerAdapterTest
