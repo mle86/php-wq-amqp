@@ -301,7 +301,7 @@ class AMQPWorkServer implements WorkServerAdapter
             $this->declared_bury_exchange = true;
 
             $this->chan->exchange_declare($exchange_name, 'fanout', false, true, false);
-            $this->chan->queue_declare($queue_name, false, true, false, false, false, $args);
+            $this->chan->queue_declare($queue_name, false, true, false, false, false);
             $this->chan->queue_bind($queue_name, $exchange_name);
         }
 
