@@ -35,9 +35,9 @@ class AMQPWorkServer implements WorkServerAdapter
     private $exchange = '';  // AMQP default
     /** @var array  [queueName => queueConsumerTag, …] */
     private $currentQueues = [];
-    /** @var AMQPMessage|null */
+    /** @var AMQPMessage|null  The last received amqp message. Set by the message callback set up in {@see consumeQueues()}. */
     private $lastMsg;
-    /** @var string|null */
+    /** @var string|null  The quere from which the last amqp message was received. Set by the message callback set up in {@see consumeQueues()}. */
     private $lastQueue;
     /** @var bool */
     private $isDelayExchangeDeclared = false;
@@ -321,7 +321,7 @@ class AMQPWorkServer implements WorkServerAdapter
     {
         if (array_keys($this->currentQueues) === $workQueues) {
             // Same consumption list, so we don't have to change anything.
-            // The previous callbacks are also still good because they all write to $last_qe.
+            // The previous callbacks are also still good because they all write to $lastMsg.
             return;
         }
 
