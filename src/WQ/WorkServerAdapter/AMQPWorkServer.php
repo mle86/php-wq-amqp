@@ -339,7 +339,7 @@ class AMQPWorkServer implements WorkServerAdapter
 
         // now register with all queues to be consumed:
         foreach ($workQueues as $workQueue) {
-            $callback = (function(AMQPMessage $msg) use($workQueue, &$myLastMsg, &$myLastQueue) {
+            $callback = static function(AMQPMessage $msg) use($workQueue, &$myLastMsg, &$myLastQueue) {
                 // Pass info out to the getNextQueueEntry method:
                 $myLastMsg   = $msg;
                 $myLastQueue = $workQueue;
@@ -350,8 +350,8 @@ class AMQPWorkServer implements WorkServerAdapter
                  * (until the subscription gets cancelled again),
                  * so we have a circular reference that may persist for quite some time
                  * and cause a memory leak (at least until the next gc_collect_cycles call).
-                 * The bindTo(null) trick avoids that (the closure has no $this reference anymore).  */
-            })->bindTo(null);
+                 * Using "static function" avoids that (the closure has no $this reference anymore).  */
+            };
 
             $this->initQueue($workQueue);
             $consumerTag = $chan->basic_consume($workQueue, '', false, false, false, false, $callback);
