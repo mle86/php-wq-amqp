@@ -6,7 +6,8 @@ RUN \
 	apt-get update  && \
 	apt-get install -y --no-install-recommends  rabbitmq-server  && \
 	docker-php-ext-configure bcmath --enable-bcmath  && \
-	docker-php-ext-install bcmath
+	docker-php-ext-configure sockets  && \
+	docker-php-ext-install sockets bcmath
 
 VOLUME ["/mnt"]
 

@@ -42,7 +42,8 @@ It depends on
 [mle86/wq](https://github.com/mle86/php-wq)
 and [php-amqplib/php-amqplib](https://github.com/php-amqplib/php-amqplib),
 which in turn requires the
-[mbstring](https://php.net/manual/book.mbstring.php)
+[mbstring](https://php.net/manual/book.mbstring.php),
+[sockets](https://php.net/manual/book.sockets.php),
 and
 [bcmath](https://php.net/manual/book.bc.php)
 PHP extensions.
