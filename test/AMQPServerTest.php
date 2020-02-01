@@ -37,7 +37,7 @@ class AMQPServerTest extends AbstractWorkServerAdapterTest
             // continue...
         }
 
-        if ($e instanceof \ErrorException && strpos($e->getMessage(), 'unable to connect') !== false) {
+        if ($e && strpos($e->getMessage(), 'unable to connect') !== false) {
             // ok!
             return;
         }
