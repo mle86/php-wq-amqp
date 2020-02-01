@@ -10,5 +10,5 @@ fi
 
 /etc/init.d/rabbitmq-server start  # this waits for successful start-up
 
-exec su -s /bin/bash -c "$*" -- nobody
+exec runuser -u nobody -- "$@"
 
