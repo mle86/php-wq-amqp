@@ -113,6 +113,7 @@ class AMQPWorkServer implements WorkServerAdapter
             $this->chan->wait(null, false, $timeout);
         } catch (AMQPTimeoutException $e) {
             // wait() hit the timeout
+            $this->consumeQueues([]);
             return null;
         }
 
