@@ -11,9 +11,12 @@ RUN \
 
 VOLUME ["/mnt"]
 
-# The variable affects both 'rabbitmq-server' and the 10-AMQPServerTest.php script.
-# The uncommon value should prevent the tests from accidentally running on a host with a real RabbitMQ instance.
-ENV RABBITMQ_NODE_PORT 35672
+# Changing the rabbitmq port with RABBITMQ_NODE_PORT works fine for the rabbitmq-server itself,
+# but rabbitmqctl does not seem to notice the variable.
+# This leads to incorrect error messages on start-up and too little delay.
+# So now we're running the server on the default port.
+# To avoid some of the inherent risks, our tests will make sure they're running in the correct environment:
+ENV IS_MLE86_WQ_AMQP_TEST=1
 
 ADD docker-start.sh /start.sh
 RUN chmod +x /start.sh
