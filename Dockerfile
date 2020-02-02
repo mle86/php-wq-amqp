@@ -9,6 +9,10 @@ RUN \
 	docker-php-ext-configure sockets  && \
 	docker-php-ext-install sockets bcmath
 
+RUN \
+	pecl install xdebug  && \
+	docker-php-ext-enable xdebug
+
 VOLUME ["/mnt"]
 
 # Changing the rabbitmq port with RABBITMQ_NODE_PORT works fine for the rabbitmq-server itself,

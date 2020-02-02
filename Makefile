@@ -6,7 +6,7 @@ all:
 COMPOSER=./composer.phar
 
 TEST_IMAGE=mle86/php-wq-amqp-test
-TEST_IMAGE_VERSION=1.0.1
+TEST_IMAGE_VERSION=1.0.2
 
 
 # dep: Install dependencies necessary for development work on this library.
@@ -28,7 +28,12 @@ test-image:
 
 # test: Executes all phpUnit tests according to the local phpunit.xml.dist file.
 test: dep test-image
-	docker run --rm  --volume "`pwd`":/mnt:ro  $(TEST_IMAGE):$(TEST_IMAGE_VERSION)  vendor/bin/phpunit -v
+	chmod 0777 build/logs/
+	docker run --rm \
+		--volume "`pwd`":/mnt:ro  \
+		--volume "`pwd`/build/logs":/mnt/build/logs:rw  \
+		$(TEST_IMAGE):$(TEST_IMAGE_VERSION)  \
+		vendor/bin/phpunit -v
 
 clean:
 	docker rmi $(TEST_IMAGE):$(TEST_IMAGE_VERSION)  || true
