@@ -24,5 +24,9 @@
 		"php": ">=7.1",
 		"mle86/wq": "^v0.16.0||^v1.0.0",
 		"php-amqplib/php-amqplib": "^2.7"
+	},
+
+	"scripts": {
+		"test": "vendor/bin/phpunit"
 	}
 }
