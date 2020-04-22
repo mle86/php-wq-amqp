@@ -1,5 +1,5 @@
 {
-	"name": "mle86/wq-ampq",
+	"name": "mle86/wq-amqp",
 	"type": "library",
 	"description": "An AMQP module for mle86/wq using the php-amqplib connector",
 	"license": "MIT",
