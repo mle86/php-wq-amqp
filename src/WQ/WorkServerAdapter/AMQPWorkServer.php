@@ -355,7 +355,14 @@ class AMQPWorkServer implements WorkServerAdapter
             };
 
             $this->initQueue($workQueue);
-            $consumerTag = $chan->basic_consume($workQueue, '', false, false, false, false, $callback);
+            $consumerTag = $chan->basic_consume(
+                $workQueue,
+                '',
+                false,
+                false,
+                false,
+                false,
+                $callback);
             $this->currentQueues[$workQueue] = $consumerTag;
         }
     }
