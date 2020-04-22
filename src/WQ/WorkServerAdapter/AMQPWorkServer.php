@@ -119,7 +119,17 @@ class AMQPWorkServer implements WorkServerAdapter
 
         if ($this->lastMsg === null) {
             // ?!
-            return null;
+            // This means that wait() has just processed a deferred message
+            // for a previously-subscribed queue but we had cancelled the subscription
+            // before actually handling the message. That means our callback was already gone.
+            // The message is not lost: consumeQueues() has called basic_recover() already.
+            // Still, this is not the result we want to return to our callers.
+            // Let's try once more:
+            $this->chan->wait(null, true, null);
+            if ($this->lastMsg === null) {
+                // Ok, we give up for now
+                return null;
+            }
         }
 
         try {
@@ -333,7 +343,12 @@ class AMQPWorkServer implements WorkServerAdapter
             $chan->basic_cancel($consumerTag);
         }
 
-        $this->currentQueues = [];
+        // Now release all previously-received, unACK'ed messages:
+        if ($this->currentQueues) {
+            $this->chan->basic_recover(true);
+        }
+
+        $this->currentQueues = [];  // !
 
         $myLastMsg   =& $this->lastMsg;
         $myLastQueue =& $this->lastQueue;

@@ -24,11 +24,11 @@ class AMQPServerTest extends AbstractWorkServerAdapterTest
         return AMQPWorkServer::connect("localhost");
     }
 
-
     public function additionalTests(WorkServerAdapter $ws): void
     {
         $this->checkTimeoutBug($ws);
     }
+
 
     private function checkTimeoutBug(WorkServerAdapter $ws): void
     {
@@ -36,13 +36,25 @@ class AMQPServerTest extends AbstractWorkServerAdapterTest
 
         $ws->storeJob("QA",  new SimpleTestJob(611));
         $ws->storeJob("QB",  new SimpleTestJob(622));
+
         $qa1 = $ws->getNextQueueEntry("QA", 1);
+        if ($qa1)  $ws->deleteEntry($qa1);
+
         $qa2 = $ws->getNextQueueEntry("QA", 1);
+        if ($qa2)  $ws->deleteEntry($qa2);
+
         $qb1 = $ws->getNextQueueEntry(["QB","QC"], 1);
+        if ($qb1)  $ws->deleteEntry($qb1);
+
         $qb2 = $ws->getNextQueueEntry(["QB","QC"], 1);
+        if ($qb2)  $ws->deleteEntry($qb2);
+
         $ws->storeJob("QC",  new SimpleTestJob(633));
         $qb3 = $ws->getNextQueueEntry(["QB","QC"], 1);
+        if ($qb3)  $ws->deleteEntry($qb3);
+
         $qb4 = $ws->getNextQueueEntry(["QB","QC"], 1);
+        if ($qb4)  $ws->deleteEntry($qb4);
 
         $expectedSequence = [611, 0,  622, 0,  633, 0];
         $receivedSequence = [
