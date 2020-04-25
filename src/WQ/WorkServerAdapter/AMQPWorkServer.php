@@ -5,6 +5,7 @@ namespace mle86\WQ\WorkServerAdapter;
 use mle86\WQ\Exception\UnserializationException;
 use mle86\WQ\Job\Job;
 use mle86\WQ\Job\QueueEntry;
+use mle86\WQ\WorkProcessor;
 use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
@@ -26,6 +27,19 @@ use PhpAmqpLib\Wire\AMQPTable;
  */
 class AMQPWorkServer implements WorkServerAdapter
 {
+
+    /**
+     * When hitting a timeout, {@see getNextQueueEntry} will cancel all queue subscriptions
+     * so that no messages get delivered to us _before_ the call (if there even is one)
+     * as they'd possibly stay reserved for the current process for a long time.
+     * There's still a race condition: cancelling the queues after a timeout is not an
+     * atomic action. That race condition could be eliminated by always calling
+     * {@see AMQPChannel::basic_recover} after the cancellations, but this would require users
+     * to delete/bury/requeue all entries before calling getNextQueueEntry again
+     * or risk possibly infinite job duplicates. (The {@see WorkProcessor} helper does this correctly.)
+     */
+    private const RECOVER_AFTER_TIMEOUT = true;
+
 
     /** @var AMQPStreamConnection */
     private $connection;
@@ -345,7 +359,12 @@ class AMQPWorkServer implements WorkServerAdapter
 
         // Now release all previously-received, unACK'ed messages:
         if ($this->currentQueues) {
-            $this->chan->basic_recover(true);
+            if ($workQueues || self::RECOVER_AFTER_TIMEOUT) {
+                $this->chan->basic_recover(true);
+            } else {
+                // empty(workQueues) only happens when getNextQueueEntry() hits a timeout.
+                // That case usually doesn't require a recovery.
+            }
         }
 
         $this->currentQueues = [];  // !
