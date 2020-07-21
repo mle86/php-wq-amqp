@@ -8,6 +8,8 @@ use mle86\WQ\Job\QueueEntry;
 use mle86\WQ\WorkProcessor;
 use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
+use PhpAmqpLib\Exception\AMQPChannelClosedException;
+use PhpAmqpLib\Exception\AMQPConnectionClosedException;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
 use PhpAmqpLib\Message\AMQPMessage;
 use PhpAmqpLib\Wire\AMQPTable;
@@ -109,6 +111,8 @@ class AMQPWorkServer implements WorkServerAdapter
 
     public function getNextQueueEntry($workQueue, int $timeout = self::DEFAULT_TIMEOUT): ?QueueEntry
     {
+        $this->checkConnection();
+
         if ($timeout === WorkServerAdapter::NOBLOCK) {
             // basic_consume+wait does not support a timeout less than 1sec which is pretty long,
             // so we'll use basic_get() instead:
@@ -195,6 +199,7 @@ class AMQPWorkServer implements WorkServerAdapter
 
     public function storeJob(string $workQueue, Job $job, int $delay = 0): void
     {
+        $this->checkConnection();
         $chan = $this->chan;
         $this->initQueue($workQueue);
 
@@ -250,6 +255,7 @@ class AMQPWorkServer implements WorkServerAdapter
 
     public function deleteEntry(QueueEntry $entry): void
     {
+        $this->checkConnection();
         $this->deleteMessage($entry->getHandle());
     }
 
@@ -424,6 +430,15 @@ class AMQPWorkServer implements WorkServerAdapter
     private function getJobId(AMQPMessage $amqpMessage): string
     {
         return $amqpMessage->delivery_info['delivery_tag'] ?? '';
+    }
+
+    private function checkConnection(): void
+    {
+        if (!$this->connection->isConnected()) {
+            $this->connection->reconnect();  // !
+            $this->chan = $this->connection->channel();
+            $this->currentQueues = [];
+        }
     }
 
     public function __destruct()
