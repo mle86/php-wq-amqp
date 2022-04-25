@@ -6,7 +6,7 @@ all:
 COMPOSER=./composer.phar
 
 TEST_IMAGE=mle86/php-wq-amqp-test
-TEST_IMAGE_VERSION=1.0.2
+TEST_IMAGE_VERSION=1.1.0
 
 
 # dep: Install dependencies necessary for development work on this library.
