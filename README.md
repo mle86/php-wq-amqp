@@ -36,7 +36,7 @@ with all of its future 1.x versions as well.
 $ composer require mle86/wq-amqp
 ```
 
-It requires PHP 7.1.
+It requires PHP 8.0+.
 
 It depends on
 [mle86/wq](https://github.com/mle86/php-wq)
