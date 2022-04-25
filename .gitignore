@@ -5,3 +5,4 @@ composer.phar
 vendor/
 TEST.php
 TEST-*.php
+.phpunit.result.cache
