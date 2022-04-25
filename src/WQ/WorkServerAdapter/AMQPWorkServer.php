@@ -429,7 +429,7 @@ class AMQPWorkServer implements WorkServerAdapter
      */
     private function getJobId(AMQPMessage $amqpMessage): string
     {
-        return $amqpMessage->delivery_info['delivery_tag'] ?? '';
+        return $amqpMessage->getDeliveryTag();
     }
 
     private function checkConnection(): void
