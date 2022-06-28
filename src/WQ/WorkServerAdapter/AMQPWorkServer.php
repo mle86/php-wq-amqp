@@ -2,6 +2,7 @@
 
 namespace mle86\WQ\WorkServerAdapter;
 
+use mle86\WQ\Exception\AMQPConnectionException;
 use mle86\WQ\Exception\UnserializationException;
 use mle86\WQ\Job\Job;
 use mle86\WQ\Job\QueueEntry;
@@ -9,6 +10,7 @@ use mle86\WQ\WorkProcessor;
 use PhpAmqpLib\Channel\AMQPChannel;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 use PhpAmqpLib\Exception\AMQPChannelClosedException;
+use PhpAmqpLib\Exception\AMQPConnectionBlockedException;
 use PhpAmqpLib\Exception\AMQPConnectionClosedException;
 use PhpAmqpLib\Exception\AMQPTimeoutException;
 use PhpAmqpLib\Message\AMQPMessage;
@@ -218,7 +220,11 @@ class AMQPWorkServer implements WorkServerAdapter
         $serializedJob = serialize($job);
         $serializedJobMessage = new AMQPMessage($serializedJob, $messageProperties);
 
-        $chan->basic_publish($serializedJobMessage, $targetExchange, $targetQueue, true);
+        try {
+            $chan->basic_publish($serializedJobMessage, $targetExchange, $targetQueue, true);
+        } catch (AMQPChannelClosedException | AMQPConnectionBlockedException | AMQPConnectionClosedException $e) {
+            throw AMQPConnectionException::wrap($e);
+        }
     }
 
     /**
@@ -237,12 +243,18 @@ class AMQPWorkServer implements WorkServerAdapter
 
     private function buryMessage(AMQPMessage $amqpMessage, string $originWorkQueue): void
     {
-        // first get rid of the original message...
-        $this->deleteMessage($amqpMessage);
+        try {
+            // first get rid of the original message...
+            $this->deleteMessage($amqpMessage);
 
-        // then store an exact copy in the Bury exchange/queue for later inspection:
-        $targetExchange = $this->buryExchange();
-        $this->chan->basic_publish($amqpMessage, $targetExchange, $originWorkQueue, true);
+            // then store an exact copy in the Bury exchange/queue for later inspection:
+            $targetExchange = $this->buryExchange();
+
+            $this->chan->basic_publish($amqpMessage, $targetExchange, $originWorkQueue, true);
+
+        } catch (AMQPChannelClosedException | AMQPConnectionBlockedException | AMQPConnectionClosedException $e) {
+            throw AMQPConnectionException::wrap($e);
+        }
     }
 
     public function requeueEntry(QueueEntry $entry, int $delay, string $workQueue = null): void
@@ -434,10 +446,18 @@ class AMQPWorkServer implements WorkServerAdapter
 
     private function checkConnection(): void
     {
-        if (!$this->connection || !$this->chan || !$this->connection->isConnected() || $this->chan->getConnection()) {
+        if ($this->connection && $this->chan && $this->connection->isConnected() && $this->chan->getConnection()) {
+            // ok
+            return;
+        }
+
+        try {
             $this->connection->reconnect();  // !
             $this->chan = $this->connection->channel();
             $this->currentQueues = [];
+
+        } catch (AMQPChannelClosedException | AMQPConnectionBlockedException | AMQPConnectionClosedException $e) {
+            throw AMQPConnectionException::wrap($e);
         }
     }
 
