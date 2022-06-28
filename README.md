@@ -20,7 +20,7 @@ Empty queues or exchanges won't be deleted automatically.
 # Version and Compatibility
 
 This is
-**version 1.3.0**
+**version 1.4.0**
 of `mle86/wq-amqp`.
 
 It was developed for
