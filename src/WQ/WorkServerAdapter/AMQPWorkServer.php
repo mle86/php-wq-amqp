@@ -273,7 +273,7 @@ class AMQPWorkServer implements WorkServerAdapter
 
     private function deleteMessage(AMQPMessage $amqpMessage): void
     {
-        $deliveryTag = $amqpMessage->delivery_info['delivery_tag'];
+        $deliveryTag = $amqpMessage->getDeliveryTag();
         $this->chan->basic_ack($deliveryTag);
     }
 
