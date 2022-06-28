@@ -434,7 +434,7 @@ class AMQPWorkServer implements WorkServerAdapter
 
     private function checkConnection(): void
     {
-        if (!$this->connection->isConnected()) {
+        if (!$this->connection || !$this->chan || !$this->connection->isConnected() || $this->chan->getConnection()) {
             $this->connection->reconnect();  // !
             $this->chan = $this->connection->channel();
             $this->currentQueues = [];
